@@ -1,0 +1,133 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Muse palette as RGB triplets so Tailwind's <alpha-value> works.
+ * Light is the base :root; dark redefines only the tokens.
+ */
+:root {
+  --c-ground: 251 247 246;
+  --c-surface: 255 255 255;
+  --c-surface-2: 245 238 236;
+  --c-ink: 27 20 24;
+  --c-ink-2: 90 79 83;
+  --c-ink-3: 139 128 133;
+  --c-border: 234 223 221;
+  --c-border-2: 220 207 204;
+  --c-accent: 214 41 107;
+  --c-accent-soft: 252 231 239;
+  --c-accent-ink: 161 19 80;
+  --c-gold: 185 138 69;
+  --c-gold-soft: 247 238 221;
+  --c-good: 46 139 107;
+  --c-good-soft: 226 241 235;
+  --c-warn: 201 138 30;
+  --c-warn-soft: 248 238 216;
+  --c-crit: 200 68 59;
+  --c-crit-soft: 248 227 225;
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --c-ground: 20 16 19;
+    --c-surface: 29 23 27;
+    --c-surface-2: 36 29 34;
+    --c-ink: 244 236 239;
+    --c-ink-2: 195 182 187;
+    --c-ink-3: 142 131 136;
+    --c-border: 51 42 47;
+    --c-border-2: 69 58 64;
+    --c-accent: 240 86 143;
+    --c-accent-soft: 58 22 38;
+    --c-accent-ink: 247 157 188;
+    --c-gold: 214 168 96;
+    --c-gold-soft: 51 41 26;
+    --c-good: 95 191 152;
+    --c-good-soft: 24 46 39;
+    --c-warn: 224 174 82;
+    --c-warn-soft: 51 40 19;
+    --c-crit: 232 119 110;
+    --c-crit-soft: 51 27 26;
+  }
+}
+
+:root[data-theme="dark"] {
+  --c-ground: 20 16 19;
+  --c-surface: 29 23 27;
+  --c-surface-2: 36 29 34;
+  --c-ink: 244 236 239;
+  --c-ink-2: 195 182 187;
+  --c-ink-3: 142 131 136;
+  --c-border: 51 42 47;
+  --c-border-2: 69 58 64;
+  --c-accent: 240 86 143;
+  --c-accent-soft: 58 22 38;
+  --c-accent-ink: 247 157 188;
+  --c-gold: 214 168 96;
+  --c-gold-soft: 51 41 26;
+  --c-good: 95 191 152;
+  --c-good-soft: 24 46 39;
+  --c-warn: 224 174 82;
+  --c-warn-soft: 51 40 19;
+  --c-crit: 232 119 110;
+  --c-crit-soft: 51 27 26;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-ground text-ink font-sans antialiased;
+  }
+  ::selection {
+    background: rgb(var(--c-accent) / 0.2);
+  }
+  *:focus-visible {
+    outline: 2px solid rgb(var(--c-accent));
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* App is a mobile-first centered column that stays phone-width on desktop. */
+  .app-shell {
+    @apply mx-auto w-full max-w-app min-h-dvh bg-ground relative;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3
+           text-[15px] font-semibold transition-colors disabled:opacity-50
+           disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-ink;
+  }
+  .btn-ghost {
+    @apply btn bg-surface-2 text-ink hover:bg-border;
+  }
+  .btn-outline {
+    @apply btn border border-border-2 text-ink hover:bg-surface-2;
+  }
+  .card {
+    @apply bg-surface border border-border rounded-xl shadow-card;
+  }
+  .field {
+    @apply w-full rounded-xl border border-border bg-surface px-4 py-3 text-[15px]
+           text-ink placeholder:text-ink-3 focus:border-accent outline-none;
+  }
+  .label {
+    @apply block text-[13px] font-semibold text-ink-2 mb-1.5;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold;
+  }
+}
