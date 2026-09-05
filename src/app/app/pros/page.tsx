@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { listProfessionals } from "@/lib/reads";
 import { Avatar, Badge, Empty } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { clsx } from "@/lib/clsx";
@@ -19,24 +19,8 @@ export default async function ProsPage({
 }: {
   searchParams: { cat?: string; sort?: string; q?: string };
 }) {
-  const supabase = createClient();
   const { cat, sort = "rating", q } = searchParams;
-
-  let query = supabase
-    .from("professional_profiles")
-    .select("user_id, name, avatar_url, region, career, specialties, services, rating_avg, review_count")
-    .eq("approved", true)
-    .limit(50);
-
-  if (q) query = query.ilike("name", `%${q}%`);
-  if (cat) query = query.contains("specialties", [cat]);
-  query =
-    sort === "reviews" ? query.order("review_count", { ascending: false })
-    : sort === "recent" ? query.order("created_at", { ascending: false })
-    : query.order("rating_avg", { ascending: false });
-
-  const { data } = await query;
-  const pros = data ?? [];
+  const pros = await listProfessionals({ cat, sort, q, limit: 50 });
 
   const chip = (href: string, label: string, active: boolean) => (
     <Link key={label} href={href}

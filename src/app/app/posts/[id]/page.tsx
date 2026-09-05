@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getRecruitPost, countApplicants, getMyApplication } from "@/lib/reads";
 import { Avatar, Badge, statusTone } from "@/components/ui";
-import { POST_SELECT } from "@/lib/queries";
 import { CATEGORY_LABELS, POST_STATUS_LABELS } from "@/lib/constants";
 import { costSummary } from "@/lib/format";
 import type { PostWithPro } from "@/components/PostCard";
@@ -21,19 +20,15 @@ function Row({ label, value }: { label: string; value?: React.ReactNode }) {
 }
 
 export default async function PostDetail({ params }: { params: { id: string } }) {
-  const supabase = createClient();
   const me = await getSessionUser();
 
-  const { data } = await supabase.from("recruit_posts").select(POST_SELECT).eq("id", params.id).single();
-  if (!data) notFound();
-  const post = data as unknown as PostWithPro;
+  const post = (await getRecruitPost(params.id)) as PostWithPro | null;
+  if (!post) notFound();
 
   // applicant count + already-applied check
-  const [{ count }, { data: mine }] = await Promise.all([
-    supabase.from("recruit_applications").select("id", { count: "exact", head: true }).eq("post_id", post.id),
-    me
-      ? supabase.from("recruit_applications").select("id, status").eq("post_id", post.id).eq("applicant_id", me.id).maybeSingle()
-      : Promise.resolve({ data: null }),
+  const [count, mine] = await Promise.all([
+    countApplicants(post.id),
+    me ? getMyApplication(post.id, me.id) : Promise.resolve(null),
   ]);
 
   const cover = post.reference_images?.[0] || post.result_images?.[0];

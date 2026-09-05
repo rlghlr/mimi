@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getConsultation, listConsultationOffers } from "@/lib/reads";
 import { Avatar, Badge, Empty } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { won } from "@/lib/format";
-import { CONSULTATION_SELECT, OFFER_SELECT } from "@/lib/queries";
-import { startChatFromOfferAction } from "./actions";
+import { PreparingButton } from "@/components/PreparingButton";
 import type { ConsultationRow, ConsultationOfferRow, ProfessionalProfileRow, CategoryRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -17,19 +16,12 @@ type Offer = ConsultationOfferRow & {
 };
 
 export default async function ConsultDetail({ params }: { params: { id: string } }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const { data: c } = await supabase.from("consultations").select(CONSULTATION_SELECT).eq("id", params.id).single();
-  if (!c) notFound();
-  const consult = c as unknown as Consult;
+  const consult = (await getConsultation(params.id)) as Consult | null;
+  if (!consult) notFound();
 
-  const { data: offersData } = await supabase
-    .from("consultation_offers")
-    .select(OFFER_SELECT)
-    .eq("consultation_id", params.id)
-    .order("created_at", { ascending: false });
-  const offers = (offersData ?? []) as unknown as Offer[];
+  const offers = (await listConsultationOffers(params.id)) as unknown as Offer[];
   const cat = consult.category?.name ?? (consult.category?.type && CATEGORY_LABELS[consult.category.type]);
 
   return (
@@ -92,11 +84,7 @@ export default async function ConsultDetail({ params }: { params: { id: string }
                 </div>
                 {o.message && <p className="text-[13px] mt-2 bg-surface-2 rounded-lg px-3 py-2">{o.message}</p>}
 
-                <form action={startChatFromOfferAction} className="mt-3">
-                  <input type="hidden" name="pro_id" value={o.pro_id} />
-                  <input type="hidden" name="consultation_id" value={consult.id} />
-                  <button className="btn-primary w-full py-2.5 text-[14px]">채팅하기</button>
-                </form>
+                <PreparingButton className="btn-primary w-full py-2.5 text-[14px] mt-3">채팅하기</PreparingButton>
               </li>
             ))}
           </ul>

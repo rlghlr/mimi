@@ -1,7 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import {
+  getProShopId, createReservation, createConsent, notify, logEvent,
+  getReservationParties, setReservationStatus, incrementNoShow,
+} from "@/lib/data";
 import { messageForError } from "@/lib/constants";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -15,7 +18,6 @@ export async function createReservationAction(
 ): Promise<ReserveState> {
   const me = await getSessionUser();
   if (!me) return { error: "로그인이 필요해요." };
-  const supabase = createClient();
 
   const proId = String(fd.get("pro_id") || "");
   if (!proId) return { error: "전문가 정보가 없어요." };
@@ -23,48 +25,41 @@ export async function createReservationAction(
   const amount = Number(fd.get("amount") || 0);
   const discount = Number(fd.get("discount") || 0);
 
-  // fetch pro's shop
-  const { data: prof } = await supabase.from("professional_profiles").select("shop_id").eq("user_id", proId).single();
-
-  const { data: reservation, error } = await supabase
-    .from("reservations")
-    .insert({
-      customer_id: me.id,
-      pro_id: proId,
-      shop_id: prof?.shop_id ?? null,
+  let reservationId: string;
+  try {
+    const shopId = await getProShopId(proId);
+    reservationId = await createReservation(me.id, {
+      proId,
+      shopId,
       service: String(fd.get("service") || "") || null,
-      session_date: String(fd.get("session_date") || "") || null,
-      session_time: String(fd.get("session_time") || "") || null,
-      duration_min: fd.get("duration_min") ? Number(fd.get("duration_min")) : null,
+      sessionDate: String(fd.get("session_date") || "") || null,
+      sessionTime: String(fd.get("session_time") || "") || null,
+      durationMin: fd.get("duration_min") ? Number(fd.get("duration_min")) : null,
       amount,
       discount,
-      final_amount: Math.max(0, amount - discount),
+      finalAmount: Math.max(0, amount - discount),
       status: "requested",
-    })
-    .select("id")
-    .single();
-  if (error || !reservation) return { error: messageForError(error) };
+    });
+  } catch (err) {
+    return { error: messageForError(err) };
+  }
 
   // electronic consent (item-by-item)
   const ip = headers().get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-  await supabase.from("consents").insert({
-    reservation_id: reservation.id,
-    user_id: me.id,
+  await createConsent(me.id, {
+    reservationId,
     face: fd.get("c_face") === "on",
     process: fd.get("c_process") === "on",
-    before_after: fd.get("c_ba") === "on",
+    beforeAfter: fd.get("c_ba") === "on",
     sns: fd.get("c_sns") === "on",
     ad: fd.get("c_ad") === "on",
     portfolio: fd.get("c_portfolio") === "on",
     ip,
   });
 
-  await supabase.rpc("notify" as never, {
-    p_user: proId, p_type: "reservation", p_title: "새 예약 요청",
-    p_body: "새로운 예약 요청이 도착했어요. 확인해 주세요.",
-    p_ref_type: "reservation", p_ref_id: reservation.id,
-  } as never);
-  await supabase.from("events").insert({ user_id: me.id, name: "reservation_create", props: { pro_id: proId } });
+  await notify(proId, "reservation", "새 예약 요청",
+    "새로운 예약 요청이 도착했어요. 확인해 주세요.", "reservation", reservationId);
+  await logEvent(me.id, "reservation_create", { pro_id: proId });
 
   revalidatePath("/app/my/reservations");
   redirect("/app/my/reservations?requested=1");
@@ -79,25 +74,22 @@ export async function updateReservationStatusAction(formData: FormData) {
   const id = String(formData.get("reservation_id"));
   const status = String(formData.get("status"));
   const me = (await getSessionUser())!;
-  const supabase = createClient();
 
-  const { data: r } = await supabase.from("reservations").select("customer_id, pro_id").eq("id", id).single();
-  if (!r) return;
+  const parties = await getReservationParties(id);
+  if (!parties) return;
 
-  await supabase.from("reservations").update({ status: status as never }).eq("id", id);
+  await setReservationStatus(id, status);
 
   if (status === "completed") {
-    await supabase.from("events").insert({ user_id: me.id, name: "reservation_complete", props: { reservation_id: id } });
+    await logEvent(me.id, "reservation_complete", { reservation_id: id });
   }
   if (status === "no_show") {
-    await supabase.rpc("increment_no_show" as never, { p_user: r.customer_id } as never);
+    await incrementNoShow(parties.customerId);
   }
 
-  const notifyTarget = me.id === r.pro_id ? r.customer_id : r.pro_id;
-  await supabase.rpc("notify" as never, {
-    p_user: notifyTarget, p_type: "reservation", p_title: "예약 상태 변경",
-    p_body: NEXT_LABEL[status] ?? "예약 상태가 변경됐어요.", p_ref_type: "reservation", p_ref_id: id,
-  } as never);
+  const notifyTarget = me.id === parties.proId ? parties.customerId : parties.proId;
+  await notify(notifyTarget, "reservation", "예약 상태 변경",
+    NEXT_LABEL[status] ?? "예약 상태가 변경됐어요.", "reservation", id);
 
   revalidatePath("/app/my/reservations");
   revalidatePath("/pro/my/reservations");

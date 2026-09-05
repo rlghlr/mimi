@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth";
+import { applyToPost } from "@/lib/data";
 import { messageForError } from "@/lib/constants";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -11,8 +12,9 @@ export async function applyAction(
   _prev: ApplyState,
   formData: FormData
 ): Promise<ApplyState> {
+  const me = await getSessionUser();
+  if (!me) return { error: "로그인이 필요해요." };
   const postId = String(formData.get("post_id") || "");
-  const supabase = createClient();
 
   const photos = {
     front: String(formData.get("photo_front") || ""),
@@ -24,16 +26,18 @@ export async function applyAction(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const { error } = await supabase.rpc("apply_to_post", {
-    p_post_id: postId,
-    p_photos: photos,
-    p_current_state: String(formData.get("current_state") || "") || undefined,
-    p_recent_history: String(formData.get("recent_history") || "") || undefined,
-    p_available_dates: dates,
-    p_message: String(formData.get("message") || "") || undefined,
-  });
-
-  if (error) return { error: messageForError(error) };
+  try {
+    await applyToPost(me.id, {
+      postId,
+      photos,
+      currentState: String(formData.get("current_state") || "") || null,
+      recentHistory: String(formData.get("recent_history") || "") || null,
+      availableDates: dates,
+      message: String(formData.get("message") || "") || null,
+    });
+  } catch (err) {
+    return { error: messageForError(err) };
+  }
 
   revalidatePath(`/app/posts/${postId}`);
   redirect("/app/my/applications?applied=1");

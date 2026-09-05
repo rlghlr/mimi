@@ -1,27 +1,5 @@
-import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth";
-import { loadChatRoom } from "@/lib/chat";
-import { ChatRoom } from "@/components/chat/ChatRoom";
+import { ChatPreparing } from "@/components/chat/ChatPreparing";
 
-export const dynamic = "force-dynamic";
-
-export default async function ProChatRoom({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const me = (await getSessionUser())!;
-  const room = await loadChatRoom(supabase, params.id, me.id);
-  if (!room) notFound();
-
-  return (
-    <ChatRoom
-      chatId={params.id}
-      meId={me.id}
-      role="professional"
-      peer={room.peer}
-      initial={room.messages}
-      blocked={room.blocked}
-      backHref="/pro/chats"
-      cta={null}
-    />
-  );
+export default function ProChatRoom() {
+  return <ChatPreparing backHref="/pro/chats" />;
 }

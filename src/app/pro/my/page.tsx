@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getProProfileCard, getCreditBalance } from "@/lib/reads";
 import { Avatar, Badge } from "@/components/ui";
 import { signOutAction } from "@/app/(auth)/actions";
 
@@ -16,12 +16,12 @@ const MENU = [
 ];
 
 export default async function ProMy() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-  const [{ data: p }, { data: credit }] = await Promise.all([
-    supabase.from("professional_profiles").select("name, avatar_url, region, approved, rating_avg, review_count").eq("user_id", me.id).single(),
-    supabase.from("credits").select("balance").eq("pro_id", me.id).maybeSingle(),
+  const [p, balance] = await Promise.all([
+    getProProfileCard(me.id),
+    getCreditBalance(me.id),
   ]);
+  const credit = { balance };
 
   return (
     <div className="pb-10">

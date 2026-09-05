@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listProReservations } from "@/lib/reads";
 import { Avatar, Badge, Empty, statusTone } from "@/components/ui";
 import { RESERVATION_STATUS_LABELS } from "@/lib/constants";
 import { won } from "@/lib/format";
-import { RESERVATION_CUST_SELECT } from "@/lib/queries";
 import { updateReservationStatusAction } from "@/app/app/reserve/actions";
 import type { ReservationRow, CustomerProfileRow, ShopRow } from "@/lib/database.types";
 
@@ -23,15 +22,8 @@ const NEXT: Record<string, { status: string; label: string; primary?: boolean }[
 };
 
 export default async function ProReservations() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data } = await supabase
-    .from("reservations")
-    .select(RESERVATION_CUST_SELECT)
-    .eq("pro_id", me.id)
-    .order("created_at", { ascending: false });
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = (await listProReservations(me.id)) as unknown as Row[];
 
   return (
     <div className="pb-8">

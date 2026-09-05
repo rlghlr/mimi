@@ -1,24 +1,19 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listNotifications } from "@/lib/reads";
+import { markAllNotificationsRead } from "@/lib/data";
 import { Empty } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function Notifications() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const { data } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", me.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const data = await listNotifications(me.id, 50);
 
   // mark all read (best-effort)
-  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", me.id).is("read_at", null);
+  await markAllNotificationsRead(me.id);
 
   const back = me.role === "professional" ? "/pro" : "/app";
 

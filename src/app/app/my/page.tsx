@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getCustomerProfile } from "@/lib/reads";
 import { Avatar } from "@/components/ui";
 import { signOutAction } from "@/app/(auth)/actions";
 
@@ -16,13 +16,8 @@ const MENU = [
 ];
 
 export default async function CustomerMy() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-  const { data: p } = await supabase
-    .from("customer_profiles")
-    .select("nickname, avatar_url, region, bio")
-    .eq("user_id", me.id)
-    .single();
+  const p = await getCustomerProfile(me.id);
 
   return (
     <div className="pb-10">

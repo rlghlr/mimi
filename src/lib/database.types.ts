@@ -1,6 +1,7 @@
-// Muse · database types.
-// Hand-written for now; regenerate once the DB is running:
-//   npm run db:types   (supabase gen types typescript --local)
+// Muse · shared domain types (enums + row shapes).
+// Hand-written; the source of truth for the DB is the Data Connect schema
+// at dataconnect/schema/schema.gql. These snake_case row shapes match what
+// the src/lib/reads.ts data layer returns to pages/components.
 
 export type Role = "customer" | "professional" | "admin";
 export type UserStatus = "active" | "pending" | "suspended" | "withdrawn" | "reported";

@@ -1,39 +1,21 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getProProfileCard, listProOwnPosts, countNewApplicants } from "@/lib/reads";
 import { Badge, Empty, statusTone } from "@/components/ui";
 import { POST_STATUS_LABELS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProHome() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const { data: profile } = await supabase
-    .from("professional_profiles")
-    .select("name, approved, rating_avg, review_count")
-    .eq("user_id", me.id)
-    .single();
+  const [profile, posts, applicantCount] = await Promise.all([
+    getProProfileCard(me.id),
+    listProOwnPosts(me.id),
+    countNewApplicants(me.id),
+  ]);
 
-  const { data: posts } = await supabase
-    .from("recruit_posts")
-    .select("id, title, status, headcount, matched_count, is_urgent, created_at")
-    .eq("pro_id", me.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  const postIds = (posts ?? []).map((p) => p.id);
-  const { count: applicantCount } = postIds.length
-    ? await supabase
-        .from("recruit_applications")
-        .select("id", { count: "exact", head: true })
-        .in("post_id", postIds)
-        .eq("status", "applied")
-    : { count: 0 };
-
-  const activeCount = (posts ?? []).filter((p) => p.status === "recruiting").length;
+  const activeCount = posts.filter((p) => p.status === "recruiting").length;
 
   return (
     <div>

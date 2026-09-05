@@ -1,41 +1,23 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listRecruitPosts, listProfessionals } from "@/lib/reads";
 import { PostCard, type PostWithPro } from "@/components/PostCard";
 import { Avatar, Badge, Empty, SectionHeader } from "@/components/ui";
 import { BRAND } from "@/lib/constants";
-import { POST_SELECT } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomerHome() {
-  const supabase = createClient();
   const me = await getSessionUser();
 
-  const [{ data: urgent }, { data: recent }, { data: pros }] = await Promise.all([
-    supabase
-      .from("recruit_posts")
-      .select(POST_SELECT)
-      .eq("status", "recruiting")
-      .eq("is_urgent", true)
-      .order("created_at", { ascending: false })
-      .limit(6),
-    supabase
-      .from("recruit_posts")
-      .select(POST_SELECT)
-      .eq("status", "recruiting")
-      .order("created_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("professional_profiles")
-      .select("user_id, name, avatar_url, region, specialties, rating_avg, review_count")
-      .eq("approved", true)
-      .order("rating_avg", { ascending: false })
-      .limit(6),
+  const [urgent, recent, pros] = await Promise.all([
+    listRecruitPosts({ urgentOnly: true, limit: 6 }),
+    listRecruitPosts({ limit: 8 }),
+    listProfessionals({ sort: "rating", limit: 6 }),
   ]);
 
-  const urgentList = (urgent ?? []) as unknown as PostWithPro[];
-  const recentList = (recent ?? []) as unknown as PostWithPro[];
+  const urgentList = urgent as unknown as PostWithPro[];
+  const recentList = recent as unknown as PostWithPro[];
 
   return (
     <div>

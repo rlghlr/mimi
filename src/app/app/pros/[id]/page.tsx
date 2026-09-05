@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getProfessional, listPortfolio, listProReviews, listProRecruitingPosts, getFavorite } from "@/lib/reads";
 import { Avatar, Badge, Empty } from "@/components/ui";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { costSummary, timeAgo } from "@/lib/format";
 import { clsx } from "@/lib/clsx";
-import { startChatWithProAction } from "./actions";
+import { PreparingButton } from "@/components/PreparingButton";
 import type { CategoryType } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -26,23 +26,17 @@ export default async function ProDetail({
   params: { id: string };
   searchParams: { tab?: string };
 }) {
-  const supabase = createClient();
   const me = await getSessionUser();
   const tab = (searchParams.tab ?? "portfolio") as (typeof TABS)[number]["key"];
 
-  const { data: p } = await supabase
-    .from("professional_profiles")
-    .select("user_id, name, avatar_url, region, career, bio, specialties, services, certificates, sns_url, rating_avg, review_count")
-    .eq("user_id", params.id)
-    .eq("approved", true)
-    .single();
+  const p = await getProfessional(params.id);
   if (!p) notFound();
 
-  const [{ data: portfolio }, { data: reviews }, { data: posts }, fav] = await Promise.all([
-    supabase.from("portfolio").select("id, image_url, caption").eq("pro_id", params.id).order("sort"),
-    supabase.from("reviews").select("id, rating, text, photos, service_name, author_id, created_at").eq("pro_id", params.id).order("created_at", { ascending: false }),
-    supabase.from("recruit_posts").select("id, title, cost_type, pay_amount, charge_amount, reference_images, status, is_urgent").eq("pro_id", params.id).eq("status", "recruiting").order("created_at", { ascending: false }),
-    me ? supabase.from("favorites").select("id").eq("user_id", me.id).eq("target_type", "professional").eq("target_id", params.id).maybeSingle() : Promise.resolve({ data: null }),
+  const [portfolio, reviews, posts, favorited] = await Promise.all([
+    listPortfolio(params.id),
+    listProReviews(params.id),
+    listProRecruitingPosts(params.id),
+    me ? getFavorite(me.id, "professional", params.id) : Promise.resolve(false),
   ]);
 
   const tabHref = (t: string) => `/app/pros/${params.id}?tab=${t}`;
@@ -54,7 +48,7 @@ export default async function ProDetail({
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M15 18l-6-6 6-6" /></svg>
         </Link>
         <span className="font-semibold truncate flex-1">{p.name}</span>
-        {me && <FavoriteButton targetType="professional" targetId={params.id} initial={!!fav?.data} />}
+        {me && <FavoriteButton targetType="professional" targetId={params.id} initial={favorited} />}
       </header>
 
       <section className="px-5 pt-3">
@@ -156,10 +150,7 @@ export default async function ProDetail({
       {me && (
         <div className="fixed bottom-0 inset-x-0 z-30">
           <div className="max-w-app mx-auto bg-surface/95 backdrop-blur border-t border-border px-5 py-3 flex gap-2">
-            <form action={startChatWithProAction} className="flex-1">
-              <input type="hidden" name="pro_id" value={params.id} />
-              <button className="btn-outline w-full">상담하기</button>
-            </form>
+            <PreparingButton className="btn-outline flex-1">상담하기</PreparingButton>
             <Link href={`/app/reserve/new?pro=${params.id}`} className="btn-primary flex-1">예약하기</Link>
           </div>
         </div>

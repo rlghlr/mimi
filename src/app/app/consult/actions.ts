@@ -1,7 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { createConsultation } from "@/lib/data";
 import { messageForError } from "@/lib/constants";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -17,20 +17,21 @@ export async function createConsultationAction(
   const content = String(fd.get("content") || "").trim();
   if (!content) return { error: "고민 내용을 입력해 주세요." };
 
-  const supabase = createClient();
-  const { error } = await supabase.from("consultations").insert({
-    customer_id: me.id,
-    category_id: String(fd.get("category_id") || "") || null,
-    content,
-    current_photo: String(fd.get("current_photo") || "") || null,
-    desired_photo: String(fd.get("desired_photo") || "") || null,
-    region: String(fd.get("region") || "") || null,
-    budget: fd.get("budget") ? Number(fd.get("budget")) : null,
-    available_dates: String(fd.get("available_dates") || "")
-      .split(",").map((s) => s.trim()).filter(Boolean),
-    status: "open",
-  });
-  if (error) return { error: messageForError(error) };
+  try {
+    await createConsultation(me.id, {
+      categoryId: String(fd.get("category_id") || "") || null,
+      content,
+      currentPhoto: String(fd.get("current_photo") || "") || null,
+      desiredPhoto: String(fd.get("desired_photo") || "") || null,
+      region: String(fd.get("region") || "") || null,
+      budget: fd.get("budget") ? Number(fd.get("budget")) : null,
+      availableDates: String(fd.get("available_dates") || "")
+        .split(",").map((s) => s.trim()).filter(Boolean),
+      status: "open",
+    });
+  } catch (err) {
+    return { error: messageForError(err) };
+  }
 
   revalidatePath("/app/consult");
   redirect("/app/consult?created=1");

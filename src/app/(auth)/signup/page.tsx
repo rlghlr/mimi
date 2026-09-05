@@ -2,19 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
-import { signUpAction, type AuthState } from "../actions";
+import { useRouter } from "next/navigation";
 import { clsx } from "@/lib/clsx";
-import type { Role } from "@/lib/database.types";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" className="btn-primary w-full" disabled={pending}>
-      {pending ? "가입 중…" : "가입 완료"}
-    </button>
-  );
-}
+import { signUp } from "@/lib/firebase/auth-client";
+import { homeFor, type Role } from "@/lib/routes";
 
 const ROLES: { key: Role; title: string; desc: string; emoji: string }[] = [
   { key: "customer", title: "일반 · 모델", desc: "시술 모델로 활동하거나 상담을 받고 싶어요", emoji: "💁" },
@@ -22,8 +13,34 @@ const ROLES: { key: Role; title: string; desc: string; emoji: string }[] = [
 ];
 
 export default function SignupPage() {
+  const router = useRouter();
   const [role, setRole] = useState<Role>("customer");
-  const [state, action] = useFormState<AuthState, FormData>(signUpAction, {});
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const fd = new FormData(e.currentTarget);
+    const email = String(fd.get("email") || "").trim();
+    const password = String(fd.get("password") || "");
+    const nickname = String(fd.get("nickname") || "").trim();
+    if (password.length < 6) {
+      setError("비밀번호는 6자 이상이어야 해요.");
+      return;
+    }
+    setPending(true);
+    try {
+      await signUp(email, password, role, nickname);
+      router.replace(homeFor(role));
+      router.refresh();
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/email-already-in-use") setError("이미 가입된 이메일이에요.");
+      else setError("가입에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      setPending(false);
+    }
+  }
 
   return (
     <main className="app-shell flex flex-col px-7 py-14">
@@ -58,8 +75,7 @@ export default function SignupPage() {
         ))}
       </div>
 
-      <form action={action} className="flex flex-col gap-4">
-        <input type="hidden" name="role" value={role} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div>
           <label className="label" htmlFor="nickname">
             {role === "professional" ? "활동명" : "닉네임"}
@@ -84,11 +100,11 @@ export default function SignupPage() {
           </p>
         )}
 
-        {state.error && (
-          <p className="text-crit text-[13px]" role="alert">{state.error}</p>
-        )}
+        {error && <p className="text-crit text-[13px]" role="alert">{error}</p>}
 
-        <SubmitButton />
+        <button type="submit" className="btn-primary w-full" disabled={pending}>
+          {pending ? "가입 중…" : "가입 완료"}
+        </button>
       </form>
 
       <p className="text-center text-sm text-ink-3 mt-8">

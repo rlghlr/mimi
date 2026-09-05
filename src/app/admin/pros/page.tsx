@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { adminListPendingPros } from "@/lib/reads";
 import { Avatar, Badge, Empty } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { approveProAction, rejectProAction } from "../actions";
@@ -7,15 +7,7 @@ import type { CategoryType } from "@/lib/database.types";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPros() {
-  const supabase = createClient();
-
-  const { data } = await supabase
-    .from("professional_profiles")
-    .select("user_id, name, avatar_url, region, career, specialties, services, certificates, sns_url, bio, approved")
-    .eq("approved", false)
-    .order("created_at", { ascending: true });
-
-  const pros = data ?? [];
+  const pros = await adminListPendingPros();
 
   return (
     <div className="p-6 md:p-10 max-w-4xl">

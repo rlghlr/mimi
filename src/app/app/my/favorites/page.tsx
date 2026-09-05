@@ -1,33 +1,13 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listFavoritesDetailed } from "@/lib/reads";
 import { Avatar, Empty } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Favorites() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data: favs } = await supabase
-    .from("favorites")
-    .select("id, target_type, target_id, created_at")
-    .eq("user_id", me.id)
-    .order("created_at", { ascending: false });
-
-  const proIds = (favs ?? []).filter((f) => f.target_type === "professional").map((f) => f.target_id);
-  const postIds = (favs ?? []).filter((f) => f.target_type === "post").map((f) => f.target_id);
-
-  const [{ data: pros }, { data: posts }] = await Promise.all([
-    proIds.length
-      ? supabase.from("professional_profiles").select("user_id, name, avatar_url, region, rating_avg").in("user_id", proIds)
-      : Promise.resolve({ data: [] }),
-    postIds.length
-      ? supabase.from("recruit_posts").select("id, title, reference_images, region").in("id", postIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const empty = !favs || favs.length === 0;
+  const { pros, posts, empty } = await listFavoritesDetailed(me.id);
 
   return (
     <div className="pb-8">

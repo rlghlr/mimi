@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listMyApplications } from "@/lib/reads";
 import { Badge, Empty, statusTone } from "@/components/ui";
 import { APPLICATION_STATUS_LABELS } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
@@ -17,15 +17,8 @@ export default async function MyApplications({
 }: {
   searchParams: { applied?: string };
 }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data } = await supabase
-    .from("recruit_applications")
-    .select("*, post:recruit_posts(id, title, status, reference_images)")
-    .eq("applicant_id", me.id)
-    .order("created_at", { ascending: false });
-  const apps = (data ?? []) as unknown as Row[];
+  const apps = (await listMyApplications(me.id)) as unknown as Row[];
 
   return (
     <div className="pb-8">

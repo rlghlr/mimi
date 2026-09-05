@@ -1,24 +1,11 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser, homeFor } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 /** Landing — routes signed-in users to their home, else shows the pitch. */
 export default async function Home() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    const { data } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (data?.role === "admin") redirect("/admin");
-    if (data?.role === "professional") redirect("/pro");
-    redirect("/app");
-  }
+  const me = await getSessionUser();
+  if (me) redirect(homeFor(me.role));
 
   return (
     <main className="app-shell flex flex-col">

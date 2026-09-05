@@ -1,9 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listOpenConsultations } from "@/lib/reads";
 import { Avatar, Badge, Empty } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { timeAgo, won } from "@/lib/format";
-import { CONSULTATION_SELECT } from "@/lib/queries";
 import { OfferComposer } from "./OfferComposer";
 import type { ConsultationRow, CustomerProfileRow, CategoryRow } from "@/lib/database.types";
 
@@ -12,29 +11,12 @@ export const dynamic = "force-dynamic";
 type Row = ConsultationRow & {
   customer?: Pick<CustomerProfileRow, "nickname" | "avatar_url" | "region"> | null;
   category?: Pick<CategoryRow, "name" | "type"> | null;
+  _offered?: boolean;
 };
 
 export default async function ProModels({ searchParams }: { searchParams: { sent?: string } }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data } = await supabase
-    .from("consultations")
-    .select(CONSULTATION_SELECT)
-    .in("status", ["open", "offered"])
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  const items = (data ?? []) as unknown as Row[];
-
-  // which ones I've already offered on
-  const ids = items.map((c) => c.id);
-  const offered = new Set<string>();
-  if (ids.length) {
-    const { data: mine } = await supabase
-      .from("consultation_offers").select("consultation_id").eq("pro_id", me.id).in("consultation_id", ids);
-    (mine ?? []).forEach((o) => offered.add(o.consultation_id));
-  }
+  const items = (await listOpenConsultations(me.id)) as unknown as Row[];
 
   return (
     <div className="pb-8">
@@ -69,7 +51,7 @@ export default async function ProModels({ searchParams }: { searchParams: { sent
                 </div>
                 <p className="text-[14px] text-ink-2 line-clamp-3">{c.content}</p>
 
-                {offered.has(c.id) ? (
+                {c._offered ? (
                   <div className="mt-3"><Badge tone="good">제안 완료</Badge></div>
                 ) : (
                   <OfferComposer consultationId={c.id} />

@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { listRecruitPosts } from "@/lib/reads";
 import { PostCard, type PostWithPro } from "@/components/PostCard";
 import { Empty } from "@/components/ui";
-import { POST_SELECT } from "@/lib/queries";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { clsx } from "@/lib/clsx";
-import type { CategoryType } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,31 +14,14 @@ export default async function PostsPage({
 }: {
   searchParams: { cat?: string; urgent?: string; q?: string };
 }) {
-  const supabase = createClient();
   const { cat, urgent, q } = searchParams;
 
-  let query = supabase
-    .from("recruit_posts")
-    .select(POST_SELECT)
-    .eq("status", "recruiting")
-    .order("is_urgent", { ascending: false })
-    .order("boost_until", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(40);
-
-  if (urgent === "1") query = query.eq("is_urgent", true);
-  if (q) query = query.ilike("title", `%${q}%`);
-  if (cat) {
-    const { data: c } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("type", cat as CategoryType)
-      .single();
-    if (c) query = query.eq("category_id", c.id);
-  }
-
-  const { data } = await query;
-  const posts = (data ?? []) as unknown as PostWithPro[];
+  const posts = (await listRecruitPosts({
+    urgentOnly: urgent === "1",
+    q,
+    categoryType: cat,
+    limit: 40,
+  })) as unknown as PostWithPro[];
 
   const chip = (href: string, label: string, active: boolean) => (
     <Link

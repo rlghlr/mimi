@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listCustomerReservations, reviewedReservationIds } from "@/lib/reads";
 import { Avatar, Badge, Empty, statusTone } from "@/components/ui";
 import { RESERVATION_STATUS_LABELS } from "@/lib/constants";
 import { won } from "@/lib/format";
-import { RESERVATION_PRO_SELECT } from "@/lib/queries";
 import { updateReservationStatusAction } from "@/app/app/reserve/actions";
 import type { ReservationRow, ProfessionalProfileRow, ShopRow } from "@/lib/database.types";
 
@@ -17,23 +16,13 @@ type Row = ReservationRow & {
 };
 
 export default async function MyReservations({ searchParams }: { searchParams: { requested?: string } }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const { data } = await supabase
-    .from("reservations")
-    .select(RESERVATION_PRO_SELECT)
-    .eq("customer_id", me.id)
-    .order("created_at", { ascending: false });
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = (await listCustomerReservations(me.id)) as unknown as Row[];
 
   // which completed reservations already have a review
   const completedIds = rows.filter((r) => r.status === "completed").map((r) => r.id);
-  const reviewed = new Set<string>();
-  if (completedIds.length) {
-    const { data: rv } = await supabase.from("reviews").select("reservation_id").in("reservation_id", completedIds);
-    (rv ?? []).forEach((r) => r.reservation_id && reviewed.add(r.reservation_id));
-  }
+  const reviewed = await reviewedReservationIds(completedIds);
 
   return (
     <div className="pb-8">

@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listMyConsultations } from "@/lib/reads";
 import { Badge, Empty, statusTone } from "@/components/ui";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
-import { CONSULTATION_SELECT } from "@/lib/queries";
 import type { ConsultationRow, CategoryRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -19,24 +18,8 @@ type Row = ConsultationRow & {
 };
 
 export default async function ConsultList({ searchParams }: { searchParams: { created?: string } }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data } = await supabase
-    .from("consultations")
-    .select(CONSULTATION_SELECT)
-    .eq("customer_id", me.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-  const items = (data ?? []) as unknown as Row[];
-
-  // offer counts
-  const ids = items.map((c) => c.id);
-  const counts = new Map<string, number>();
-  if (ids.length) {
-    const { data: offers } = await supabase.from("consultation_offers").select("consultation_id").in("consultation_id", ids);
-    (offers ?? []).forEach((o) => counts.set(o.consultation_id, (counts.get(o.consultation_id) ?? 0) + 1));
-  }
+  const items = (await listMyConsultations(me.id)) as unknown as Row[];
 
   return (
     <div className="pb-8">
@@ -57,7 +40,7 @@ export default async function ConsultList({ searchParams }: { searchParams: { cr
         <ul className="px-5 py-4 flex flex-col gap-3">
           {items.map((c) => {
             const cat = c.category?.name ?? (c.category?.type && CATEGORY_LABELS[c.category.type]);
-            const n = counts.get(c.id) ?? 0;
+            const n = c.offer_count ?? 0;
             return (
               <li key={c.id}>
                 <Link href={`/app/consult/${c.id}`} className="card p-4 block">

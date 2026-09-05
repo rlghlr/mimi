@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getPostForApplicants, listPostApplicants } from "@/lib/reads";
 import { Avatar, Badge, Empty, statusTone } from "@/components/ui";
-import { APPLICATION_SELECT } from "@/lib/queries";
 import { APPLICATION_STATUS_LABELS, POST_STATUS_LABELS } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
-import { startChatAction, rejectApplicantAction, confirmMatchAction } from "./actions";
+import { rejectApplicantAction, confirmMatchAction } from "./actions";
+import { PreparingButton } from "@/components/PreparingButton";
 import { updatePostStatusAction } from "../../actions";
 import type { RecruitApplicationRow, CustomerProfileRow } from "@/lib/database.types";
 
@@ -23,22 +23,12 @@ export default async function ApplicantsPage({
   params: { id: string };
   searchParams: { err?: string };
 }) {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const { data: post } = await supabase
-    .from("recruit_posts")
-    .select("id, pro_id, title, status, headcount, matched_count")
-    .eq("id", params.id)
-    .single();
-  if (!post || post.pro_id !== me.id) notFound();
+  const post = await getPostForApplicants(params.id, me.id);
+  if (!post) notFound();
 
-  const { data } = await supabase
-    .from("recruit_applications")
-    .select(APPLICATION_SELECT)
-    .eq("post_id", params.id)
-    .order("created_at", { ascending: false });
-  const apps = (data ?? []) as unknown as AppRow[];
+  const apps = (await listPostApplicants(params.id)) as unknown as AppRow[];
 
   const full = post.matched_count >= post.headcount;
 
@@ -114,12 +104,7 @@ export default async function ApplicantsPage({
 
                 {!done && (
                   <div className="flex gap-2 mt-3.5">
-                    <form action={startChatAction} className="flex-1">
-                      <input type="hidden" name="application_id" value={a.id} />
-                      <input type="hidden" name="applicant_id" value={a.applicant_id} />
-                      <input type="hidden" name="post_id" value={post.id} />
-                      <button className="btn-outline w-full py-2.5 text-[14px]">채팅하기</button>
-                    </form>
+                    <PreparingButton className="btn-outline flex-1 py-2.5 text-[14px]">채팅하기</PreparingButton>
                     {!full && (
                       <form action={confirmMatchAction} className="flex-1">
                         <input type="hidden" name="applicant_id" value={a.applicant_id} />

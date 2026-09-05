@@ -1,20 +1,20 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { getProApproved } from "@/lib/data";
+import { listCategories } from "@/lib/reads";
 import { PostForm } from "./PostForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewPostPage() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
 
-  const [{ data: profile }, { data: categories }] = await Promise.all([
-    supabase.from("professional_profiles").select("approved").eq("user_id", me.id).single(),
-    supabase.from("categories").select("id, name, type").order("sort"),
+  const [approved, categories] = await Promise.all([
+    getProApproved(me.id),
+    listCategories(),
   ]);
 
-  if (!profile?.approved) {
+  if (!approved) {
     return (
       <div className="px-5 py-16 text-center">
         <div className="text-3xl mb-3">🔒</div>
@@ -27,5 +27,5 @@ export default async function NewPostPage() {
     );
   }
 
-  return <PostForm categories={categories ?? []} />;
+  return <PostForm categories={categories} />;
 }

@@ -1,62 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
+import { adminDashboard } from "@/lib/reads";
 
 export const dynamic = "force-dynamic";
 
-async function count(
-  supabase: ReturnType<typeof createClient>,
-  table: string,
-  build?: (q: any) => any
-): Promise<number> {
-  let q = supabase.from(table as never).select("id", { count: "exact", head: true });
-  if (build) q = build(q);
-  const { count } = await q;
-  return count ?? 0;
-}
-
 export default async function AdminDashboard() {
-  const supabase = createClient();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const iso = today.toISOString();
-
-  const [
-    users, pros, pendingPros, posts, applications, matches, reservations,
-    tVisit, tSignup, tApply, tChat, tMatch, tReserve, tComplete,
-  ] = await Promise.all([
-    count(supabase, "users"),
-    count(supabase, "users", (q) => q.eq("role", "professional")),
-    count(supabase, "users", (q) => q.eq("role", "professional").eq("status", "pending")),
-    count(supabase, "recruit_posts"),
-    count(supabase, "recruit_applications"),
-    count(supabase, "matches", (q) => q.eq("status", "confirmed")),
-    count(supabase, "reservations"),
-    // funnel (events, all-time)
-    count(supabase, "events", (q) => q.eq("name", "visit")),
-    count(supabase, "events", (q) => q.eq("name", "signup")),
-    count(supabase, "events", (q) => q.eq("name", "apply")),
-    count(supabase, "events", (q) => q.eq("name", "chat_open")),
-    count(supabase, "events", (q) => q.eq("name", "match_confirm")),
-    count(supabase, "events", (q) => q.eq("name", "reservation_create")),
-    count(supabase, "events", (q) => q.eq("name", "reservation_complete")),
-  ]);
-
-  // today's new users
-  const newToday = await count(supabase, "users", (q) => q.gte("created_at", iso));
+  const { stats: s, funnel: f } = await adminDashboard();
 
   const stats = [
-    { label: "전체 회원", value: users },
-    { label: "전문가", value: pros },
-    { label: "승인 대기", value: pendingPros, tone: "warn" },
-    { label: "오늘 가입", value: newToday },
-    { label: "등록 공고", value: posts },
-    { label: "총 지원", value: applications },
-    { label: "매칭 완료", value: matches },
-    { label: "예약", value: reservations },
+    { label: "전체 회원", value: s.users },
+    { label: "전문가", value: s.pros },
+    { label: "승인 대기", value: s.pendingPros, tone: "warn" },
+    { label: "오늘 가입", value: s.newToday },
+    { label: "등록 공고", value: s.posts },
+    { label: "총 지원", value: s.applications },
+    { label: "매칭 완료", value: s.matches },
+    { label: "예약", value: s.reservations },
   ];
 
   const funnel = [
-    ["방문", tVisit], ["가입", tSignup], ["지원", tApply], ["채팅", tChat],
-    ["매칭", tMatch], ["예약", tReserve], ["시술완료", tComplete],
+    ["방문", f.visit], ["가입", f.signup], ["지원", f.apply], ["채팅", f.chat],
+    ["매칭", f.match], ["예약", f.reserve], ["시술완료", f.complete],
   ] as const;
   const fMax = Math.max(1, ...funnel.map(([, v]) => v));
 

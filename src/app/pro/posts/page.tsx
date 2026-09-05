@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { listProOwnPosts } from "@/lib/reads";
 import { Badge, Empty, statusTone } from "@/components/ui";
 import { POST_STATUS_LABELS } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
@@ -8,25 +8,8 @@ import { timeAgo } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function ProPostsPage() {
-  const supabase = createClient();
   const me = (await getSessionUser())!;
-
-  const { data: posts } = await supabase
-    .from("recruit_posts")
-    .select("id, title, status, headcount, matched_count, is_urgent, created_at")
-    .eq("pro_id", me.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-
-  const ids = (posts ?? []).map((p) => p.id);
-  const counts = new Map<string, number>();
-  if (ids.length) {
-    const { data: apps } = await supabase
-      .from("recruit_applications")
-      .select("post_id")
-      .in("post_id", ids);
-    (apps ?? []).forEach((a) => counts.set(a.post_id, (counts.get(a.post_id) ?? 0) + 1));
-  }
+  const posts = await listProOwnPosts(me.id);
 
   return (
     <div className="pb-8">
@@ -49,7 +32,7 @@ export default async function ProPostsPage() {
                   </div>
                   <div className="font-semibold text-[14px] truncate">{p.title}</div>
                   <div className="text-[12px] text-ink-3 mt-0.5">
-                    지원 {counts.get(p.id) ?? 0} · 매칭 {p.matched_count}/{p.headcount} · {timeAgo(p.created_at)}
+                    지원 {p.applicant_count ?? 0} · 매칭 {p.matched_count}/{p.headcount} · {timeAgo(p.created_at)}
                   </div>
                 </div>
                 <span className="text-ink-3">›</span>

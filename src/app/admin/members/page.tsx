@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { adminListUsers } from "@/lib/reads";
 import { Badge, Empty } from "@/components/ui";
 import { setUserStatusAction } from "../actions";
 import { timeAgo } from "@/lib/format";
@@ -17,17 +17,8 @@ export default async function AdminMembers({
 }: {
   searchParams: { role?: string };
 }) {
-  const supabase = createClient();
   const role = searchParams.role;
-
-  let q = supabase
-    .from("users")
-    .select("id, email, role, status, no_show_count, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (role) q = q.eq("role", role as never);
-  const { data } = await q;
-  const users = data ?? [];
+  const users = await adminListUsers(role);
 
   const tab = (href: string, label: string, active: boolean) => (
     <a href={href} className={`chip border ${active ? "bg-ink text-ground border-ink" : "bg-surface text-ink-2 border-border"}`}>{label}</a>
